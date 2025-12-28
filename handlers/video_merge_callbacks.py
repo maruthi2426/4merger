@@ -54,7 +54,6 @@ async def handle_merge_callbacks(update: Update, context: ContextTypes.DEFAULT_T
                 return
             
             if upload_mode.get("engine") == "telegram":
-                # Telegram: show format selection first
                 await query.edit_message_text(
                     text="📱 TELEGRAM UPLOAD FORMAT\n━━━━━━━━━━━━━━━━━━\n"
                          "Choose how to upload merged video:\n\n"
@@ -67,12 +66,61 @@ async def handle_merge_callbacks(update: Update, context: ContextTypes.DEFAULT_T
                 logger.info(f"User {user_id} shown format selection for merge")
                 return
             elif upload_mode.get("engine") == "rclone":
-                # Rclone: directly show rename options
                 await _show_rename_options(query, user_id)
                 return
         
+        elif callback_data == "merge_use_default":
+            """User chose to use default filename (merged_video.mp4)"""
+            context.user_data["merged_filename"] = "merged_video.mp4"
+            context.user_data["awaiting_merge_filename"] = False
+            
+            # Start merge with default filename
+            from handlers.video_merge_processor import execute_smart_merge
+            await execute_smart_merge(update, context)
+        
+        elif callback_data == "merge_ask_rename":
+            """User chose to rename - ask for custom filename"""
+            context.user_data["awaiting_merge_filename"] = True
+            
+            await query.edit_message_text(
+                text="📝 CUSTOM FILENAME\n━━━━━━━━━━━━━━━━━━\n\n"
+                     "Send the desired filename for merged video.\n\n"
+                     "Examples:\n"
+                     "• my_video.mp4\n"
+                     "• my_video (extension auto-added)\n"
+                     "• birthday_celebration.mp4\n\n"
+                     "Don't worry about the extension, we'll handle it!",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("❌ Cancel", callback_data="merge_confirm_back")
+                ]])
+            )
+            logger.info(f"User {user_id} started rename process")
+        
+        elif callback_data == "merge_confirm_back":
+            """User cancelled rename, go back to rename options"""
+            context.user_data["awaiting_merge_filename"] = False
+            await _show_rename_options(query, user_id)
+        
         elif callback_data == "merge_cancel":
             await show_merge_menu(update, context, edit=True)
+        
+        elif callback_data == "telegram_format_video":
+            """User selected Video format for Telegram merge"""
+            context.user_data["upload_mode"]["format"] = "video"
+            context.user_data["awaiting_merge_format"] = False
+            
+            # Show rename options after format selection
+            await _show_rename_options(query, user_id)
+            logger.info(f"User {user_id} selected Video format for merge")
+        
+        elif callback_data == "telegram_format_document":
+            """User selected Document format for Telegram merge"""
+            context.user_data["upload_mode"]["format"] = "document"
+            context.user_data["awaiting_merge_format"] = False
+            
+            # Show rename options after format selection
+            await _show_rename_options(query, user_id)
+            logger.info(f"User {user_id} selected Document format for merge")
         
     except Exception as e:
         logger.error(f"Error in merge callback: {e}")
@@ -92,7 +140,7 @@ async def _show_rename_options(query, user_id):
                 InlineKeyboardButton("✏️ Rename", callback_data="merge_ask_rename")
             ],
             [
-                InlineKeyboardButton("⬅️ Back", callback_data="merge_confirm_back"),
+                InlineKeyboardButton("⬅️ Back", callback_data="merge_menu"),
                 InlineKeyboardButton("❌ Cancel", callback_data="merge_menu")
             ]
         ])

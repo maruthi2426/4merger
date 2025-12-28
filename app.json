@@ -1,0 +1,24 @@
+{
+  "name": "Video Merger Telegram Bot",
+  "description": "Powerful Telegram bot for video editing and merging with FFmpeg",
+  "repository": "https://github.com/yourusername/video-merger-bot",
+  "keywords": ["telegram", "bot", "video", "ffmpeg"],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    },
+    {
+      "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
+    }
+  ],
+  "env": {
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "Your Telegram bot token from @BotFather",
+      "required": true
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level (INFO, DEBUG, WARNING, ERROR)",
+      "value": "INFO"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: video-merger-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: starter
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        scope: run
+      - key: WEBHOOK_URL
+        scope: run
+      - key: PORT
+        scope: run
+        value: "10000"
+      - key: LOG_LEVEL
+        scope: run
+        value: INFO

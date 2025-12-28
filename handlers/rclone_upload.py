@@ -238,12 +238,13 @@ async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
 async def rclone_upload(filepath: str, drive_name: str, conf_path: str, task: RCUploadTask, status_msg) -> dict:
     """Execute rclone copy command."""
     try:
+        # This ensures merged files go directly to the cloud storage root
         rclone_copy_cmd = [
             "rclone",
             "copy",
             f"--config={conf_path}",
             str(filepath),
-            f"{drive_name}:VideoMerger/",
+            f"{drive_name}:/",
             "-P",
             "--stats=2s"
         ]

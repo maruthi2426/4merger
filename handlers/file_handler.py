@@ -57,7 +57,6 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     if '[' not in content or ']' not in content:
                         raise ValueError("Invalid rclone config format")
                 
-                # Config is valid, set rclone mode
                 context.user_data["upload_mode"] = {
                     "engine": "rclone",
                     "configured": True
@@ -68,15 +67,6 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 
                 from keyboards.main_keyboard import get_main_keyboard
                 
-                await update.message.reply_text(
-                    "✅ RCLONE CONFIGURED\n━━━━━━━━━━━━━━━━━━\n\n"
-                    "Your rclone configuration has been successfully saved!\n"
-                    "You can now use Rclone upload mode.\n\n"
-                    "Returning to main menu...",
-                    reply_to_message_id=update.message.message_id
-                )
-                
-                # Send main menu with rclone checkmark
                 await update.message.reply_text(
                     "🎬 Welcome to Video Merger Bot!\n\nSelect a category:",
                     reply_markup=get_main_keyboard(context.user_data.get("upload_mode"))

@@ -54,6 +54,7 @@ async def handle_merge_callbacks(update: Update, context: ContextTypes.DEFAULT_T
                 return
             
             if upload_mode.get("engine") == "telegram":
+                # Telegram: show format selection first
                 await query.edit_message_text(
                     text="📱 TELEGRAM UPLOAD FORMAT\n━━━━━━━━━━━━━━━━━━\n"
                          "Choose how to upload merged video:\n\n"
@@ -62,13 +63,13 @@ async def handle_merge_callbacks(update: Update, context: ContextTypes.DEFAULT_T
                          "Select your preferred format:",
                     reply_markup=get_telegram_format_keyboard()
                 )
-                # Store that we're in merge confirmation state
                 context.user_data["awaiting_merge_format"] = True
                 logger.info(f"User {user_id} shown format selection for merge")
                 return
-            
-            from handlers.video_merge_processor import execute_smart_merge
-            await execute_smart_merge(update, context)
+            elif upload_mode.get("engine") == "rclone":
+                # Rclone: directly show rename options
+                await _show_rename_options(query, user_id)
+                return
         
         elif callback_data == "merge_cancel":
             await show_merge_menu(update, context, edit=True)
@@ -76,3 +77,24 @@ async def handle_merge_callbacks(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as e:
         logger.error(f"Error in merge callback: {e}")
         await query.answer(f"Error: {str(e)}", show_alert=True)
+
+
+async def _show_rename_options(query, user_id):
+    """Show Default/Rename buttons with Back and Cancel for file naming."""
+    await query.edit_message_text(
+        text="📝 FILENAME SELECTION\n━━━━━━━━━━━━━━━━━━\n\n"
+             "How would you like to name the merged file?\n\n"
+             "📌 Default: merged_video.mp4\n"
+             "✏️ Rename: Choose a custom name",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📌 Default", callback_data="merge_use_default"),
+                InlineKeyboardButton("✏️ Rename", callback_data="merge_ask_rename")
+            ],
+            [
+                InlineKeyboardButton("⬅️ Back", callback_data="merge_confirm_back"),
+                InlineKeyboardButton("❌ Cancel", callback_data="merge_menu")
+            ]
+        ])
+    )
+    logger.info(f"User {user_id} shown rename options")

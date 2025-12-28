@@ -124,6 +124,8 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         start_time = time.time()
         
+        merged_filename = context.user_data.get("merged_filename", "merged_video.mp4")
+        
         # This prevents "Message to edit not found" errors
         try:
             status_msg = await query.edit_message_text(
@@ -152,7 +154,7 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         total_size_mb = sum(os.path.getsize(v.file_path) / (1024 * 1024) for v in queue.videos)
         total_duration = queue.get_total_duration()
-        output_file = os.path.join(file_manager.TEMP_FOLDER, "merged_video.mp4")
+        output_file = os.path.join(file_manager.TEMP_FOLDER, merged_filename)
         
         try:
             await status_msg.edit_text(
@@ -256,11 +258,11 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
             upload_as_document = upload_mode.get("format") == "document"
             await _upload_to_telegram(
                 context, user_id, output_file, file_size_mb, 
-                queue, start_time, status_msg, upload_as_document
+                queue, start_time, status_msg, upload_as_document, merged_filename
             )
         elif upload_engine == "rclone":
             await _upload_to_rclone(
-                context, user_id, output_file, queue, start_time, status_msg
+                context, user_id, output_file, queue, start_time, status_msg, merged_filename
             )
         else:
             logger.error(f"Unknown upload engine: {upload_engine}")
@@ -268,6 +270,7 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # Cleanup
         queue.clear_all()
+        context.user_data.pop("merged_filename", None)
         try:
             if output_file and os.path.exists(output_file):
                 os.remove(output_file)
@@ -299,7 +302,7 @@ async def execute_smart_merge(update: Update, context: ContextTypes.DEFAULT_TYPE
             pass
 
 
-async def _upload_to_telegram(context, user_id, filepath, file_size_mb, queue, start_time, status_msg, upload_as_document):
+async def _upload_to_telegram(context, user_id, filepath, file_size_mb, queue, start_time, status_msg, upload_as_document, filename):
     """Upload file to Telegram using selected format (video or document)."""
     try:
         with open(filepath, 'rb') as f:
@@ -308,7 +311,7 @@ async def _upload_to_telegram(context, user_id, filepath, file_size_mb, queue, s
                     chat_id=user_id,
                     document=f,
                     caption=f"✅ MERGE COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
-                            f"📁 merged_video.mp4\n"
+                            f"📁 {filename}\n"
                             f"📊 Size: {file_size_mb:.2f}MB\n"
                             f"⏱️ Duration: {queue._format_duration(queue.get_total_duration())}\n\n"
                             f"⏲️ Processing time: {int(time.time() - start_time)}s"
@@ -318,7 +321,7 @@ async def _upload_to_telegram(context, user_id, filepath, file_size_mb, queue, s
                     chat_id=user_id,
                     video=f,
                     caption=f"✅ MERGE COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
-                            f"📹 merged_video.mp4\n"
+                            f"📹 {filename}\n"
                             f"📊 Size: {file_size_mb:.2f}MB\n"
                             f"⏱️ Duration: {queue._format_duration(queue.get_total_duration())}\n\n"
                             f"⏲️ Processing time: {int(time.time() - start_time)}s"
@@ -330,19 +333,19 @@ async def _upload_to_telegram(context, user_id, filepath, file_size_mb, queue, s
         raise
 
 
-async def _upload_to_rclone(context, user_id, filepath, queue, start_time, status_msg):
+async def _upload_to_rclone(context, user_id, filepath, queue, start_time, status_msg, filename):
     """Upload file to Rclone configured drive."""
     try:
         from handlers.rclone_upload import rclone_driver
         
-        result = await rclone_driver(status_msg, user_id, filepath)
+        result = await rclone_driver(status_msg, user_id, filepath, filename)
         
         if result.get("success"):
             # Update final message with completion info
             try:
                 await status_msg.edit_text(
                     text=f"✅ MERGE & UPLOAD COMPLETE!\n━━━━━━━━━━━━━━━━━━\n\n"
-                         f"📁 File: {os.path.basename(filepath)}\n"
+                         f"📁 File: {filename}\n"
                          f"☁️ Remote: {result.get('remote', 'Unknown')}\n"
                          f"📊 Size: {os.path.getsize(filepath)/(1024*1024):.2f}MB\n"
                          f"⏱️ Total time: {int(time.time() - start_time)}s"

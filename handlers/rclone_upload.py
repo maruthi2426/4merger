@@ -126,7 +126,7 @@ class RCUploadTask(Status):
             self._error = error
 
 
-async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
+async def rclone_driver(status_msg, user_id: int, filepath: str, filename: str = None) -> dict:
     """
     Upload file to rclone configured remote drive.
     
@@ -134,6 +134,7 @@ async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
         status_msg: Telegram message object for status updates
         user_id: Telegram user ID
         filepath: Full path to file to upload
+        filename: Optional custom filename for upload (defaults to basename of filepath)
     
     Returns:
         dict: Status with success flag and details
@@ -198,13 +199,13 @@ async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
             return {"success": False, "error": "File not found"}
         
         file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
-        filename = os.path.basename(filepath)
+        upload_filename = filename if filename else os.path.basename(filepath)
         
         try:
             await status_msg.edit_text(
                 f"☁️ UPLOADING TO RCLONE\n━━━━━━━━━━━━━━━━━━\n\n"
                 f"📁 Remote: {drive_name}\n"
-                f"📄 File: {filename}\n"
+                f"📄 File: {upload_filename}\n"
                 f"📊 Size: {file_size_mb:.2f}MB\n\n"
                 f"⏳ Uploading... 0%"
             )
@@ -221,7 +222,8 @@ async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
             drive_name=drive_name,
             conf_path=conf_path,
             task=ul_task,
-            status_msg=status_msg
+            status_msg=status_msg,
+            filename=upload_filename
         )
         
         return result
@@ -235,9 +237,10 @@ async def rclone_driver(status_msg, user_id: int, filepath: str) -> dict:
         return {"success": False, "error": str(e)}
 
 
-async def rclone_upload(filepath: str, drive_name: str, conf_path: str, task: RCUploadTask, status_msg) -> dict:
+async def rclone_upload(filepath: str, drive_name: str, conf_path: str, task: RCUploadTask, status_msg, filename: str = None) -> dict:
     """Execute rclone copy command."""
     try:
+        upload_filename = filename if filename else os.path.basename(filepath)
         # This ensures merged files go directly to the cloud storage root
         rclone_copy_cmd = [
             "rclone",
@@ -250,6 +253,7 @@ async def rclone_upload(filepath: str, drive_name: str, conf_path: str, task: RC
         ]
         
         logger.info(f"Running rclone: {' '.join(rclone_copy_cmd)}")
+        logger.info(f"Uploading as: {upload_filename}")
         
         # Run rclone process
         def run_process():
@@ -269,14 +273,14 @@ async def rclone_upload(filepath: str, drive_name: str, conf_path: str, task: RC
         process.wait(timeout=1800)  # 30 minute timeout
         
         if process.returncode == 0:
-            logger.info(f"Rclone upload successful: {os.path.basename(filepath)}")
+            logger.info(f"Rclone upload successful: {upload_filename}")
             
             # Don't send confirmation message, just return success
             # The merge processor will handle the final message
             return {
                 "success": True,
                 "remote": drive_name,
-                "file": os.path.basename(filepath)
+                "file": upload_filename
             }
         else:
             logger.error(f"Rclone failed with code {process.returncode}")

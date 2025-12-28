@@ -1,7 +1,7 @@
 """Handle file uploads including rclone config file detection."""
 import logging
 import os
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.file_manager import FileManager
 from utils.ffmpeg_processor import FFmpegProcessor
@@ -82,6 +82,43 @@ async def handle_files(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 )
                 os.remove(conf_path)
                 return
+        
+        if context.user_data.get("awaiting_merge_filename"):
+            filename_text = update.message.text
+            
+            if not filename_text:
+                await update.message.reply_text(
+                    "❌ Please send a valid filename",
+                    reply_to_message_id=update.message.message_id
+                )
+                return
+            
+            # Validate and normalize filename
+            filename_text = filename_text.strip()
+            
+            # Ensure .mp4 extension
+            if not filename_text.lower().endswith('.mp4'):
+                filename_text = filename_text + '.mp4'
+            
+            # Remove invalid characters
+            invalid_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
+            for char in invalid_chars:
+                filename_text = filename_text.replace(char, '')
+            
+            context.user_data["merged_filename"] = filename_text
+            context.user_data.pop("awaiting_merge_filename", None)
+            
+            # Show continue button
+            await update.message.reply_text(
+                text=f"✅ FILENAME SET\n━━━━━━━━━━━━━━━━━━\n\n"
+                     f"📁 Filename: {filename_text}\n\n"
+                     f"Ready to merge!",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("▶️ Continue", callback_data="merge_filename_continue"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="merge_menu")
+                ]])
+            )
+            return
         
         operation = context.user_data.get("operation")
         

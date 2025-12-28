@@ -1,6 +1,6 @@
 """Handle callback queries from inline keyboards."""
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from keyboards.main_keyboard import (
     get_main_keyboard,
@@ -48,15 +48,15 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     if callback_data == "telegram_format_video" and context.user_data.get("awaiting_merge_format"):
         context.user_data["upload_mode"]["format"] = "video"
         context.user_data.pop("awaiting_merge_format", None)
-        from handlers.video_merge_processor import execute_smart_merge
-        await execute_smart_merge(update, context)
+        from handlers.video_merge_callbacks import _show_rename_options
+        await _show_rename_options(query, update.effective_user.id)
         return
     
     if callback_data == "telegram_format_document" and context.user_data.get("awaiting_merge_format"):
         context.user_data["upload_mode"]["format"] = "document"
         context.user_data.pop("awaiting_merge_format", None)
-        from handlers.video_merge_processor import execute_smart_merge
-        await execute_smart_merge(update, context)
+        from handlers.video_merge_callbacks import _show_rename_options
+        await _show_rename_options(query, update.effective_user.id)
         return
     
     # MAIN MENU NAVIGATION
@@ -346,6 +346,38 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup=get_back_close_keyboard(),
         )
         logger.info(f"User {update.effective_user.id} viewed about info")
+    
+    # NEW CALLBACKS FOR RENAME FLOW
+    elif callback_data == "merge_use_default":
+        context.user_data["merged_filename"] = "merged_video.mp4"
+        from handlers.video_merge_processor import execute_smart_merge
+        await execute_smart_merge(update, context)
+        return
+    
+    elif callback_data == "merge_ask_rename":
+        context.user_data["awaiting_merge_filename"] = True
+        await query.edit_message_text(
+            text="✏️ ENTER FILENAME\n━━━━━━━━━━━━━━━━━━\n\n"
+                 "Send the filename for merged video\n\n"
+                 "📝 Examples: my_video.mp4, output.mp4\n"
+                 "⚠️ Include the .mp4 extension",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("❌ Cancel", callback_data="merge_menu")
+            ]])
+        )
+        logger.info(f"User {update.effective_user.id} asked to enter merge filename")
+        return
+    
+    elif callback_data == "merge_confirm_back":
+        from handlers.video_merge_manager import show_merge_menu
+        await show_merge_menu(update, context, edit=True)
+        return
+    
+    elif callback_data == "merge_filename_continue":
+        context.user_data.pop("awaiting_merge_filename", None)
+        from handlers.video_merge_processor import execute_smart_merge
+        await execute_smart_merge(update, context)
+        return
     
     else:
         logger.warning(f"Unknown callback: {callback_data}")

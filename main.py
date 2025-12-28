@@ -96,6 +96,10 @@ async def on_startup():
         MessageHandler(filters.Document.ALL | filters.VIDEO | filters.AUDIO, handle_files)
     )
     
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_files)
+    )
+    
     async def error_handler(update, context):
         """Log errors caused by Updates."""
         logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
